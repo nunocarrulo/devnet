@@ -12,7 +12,7 @@ Copyright (c) 2016-2020 Cisco and/or its affiliates.
 """
 
 import sys
-
+import constants
 from webexteamssdk import WebexTeamsAPI
 import requests
 
@@ -30,7 +30,7 @@ WEBHOOK_NAME = "mywebhook"
 WEBHOOK_URL_SUFFIX = "/events"
 WEBHOOK_RESOURCE = "messages"
 WEBHOOK_EVENT = "created"
-
+debug = False
 
 def getNgrokPublicUrl():
     """Get the ngrok public HTTP URL from the local client API."""
@@ -40,8 +40,7 @@ def getNgrokPublicUrl():
         response.raise_for_status()
 
     except requests.exceptions.RequestException:
-        print("Could not connect to the ngrok client API; "
-              "assuming not running.")
+        print("Could not connect to the ngrok client API, assuming not running. Exiting...")
         return None
 
     else:
@@ -59,20 +58,24 @@ def deleteWebhooksbyName(api, name):
             api.webhooks.delete(webhook.id)
 
 
-def createNgrokWebhook(api, ngrok_public_url):
+def createNgrokWebhook(api, ngrok_public_url, me):
     """Create a Webex Teams webhook pointing to the public ngrok URL."""
     print("Creating Webhook...")
+    WEBHOOK_FILTER = 'roomId={}&mentionedPeople={}'.format(constants.myRoomId,me.id)
+    if debug:
+        print("WEBHOOK Filter:{}".format(WEBHOOK_FILTER))
     webhook = api.webhooks.create(
         name=WEBHOOK_NAME,
         targetUrl=urljoin(ngrok_public_url, WEBHOOK_URL_SUFFIX),
         resource=WEBHOOK_RESOURCE,
         event=WEBHOOK_EVENT,
+        filter=WEBHOOK_FILTER
     )
-    print(webhook)
+    if debug:
+        print(webhook)
     print("Webhook successfully created.")
     return webhook
-
-
+'''
 def main():
     """Delete previous webhooks. If local ngrok tunnel, create a webhook."""
     api = WebexTeamsAPI()
@@ -81,6 +84,6 @@ def main():
     if public_url is not None:
         createNgrokWebhook(api, public_url)
 
-
 if __name__ == '__main__':
     main()
+'''

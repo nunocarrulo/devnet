@@ -2,16 +2,12 @@ from webexteamssdk import WebexTeamsAPI, Webhook
 from office365.runtime.auth.authentication_context import AuthenticationContext
 from office365.sharepoint.client_context import ClientContext
 from office365.sharepoint.files.file import File 
-import io
+import io, sys, constants, traceback
 import pandas as pd
 from datetime import datetime
+from getpass import getpass
 
-#Constants
-relativeURL = '/sites/CMSDCOTKrakow/Shared Documents/Team Meeting Presentations/DCOT KRK Shift plan.xlsx'
-siteURL = 'https://cisco.sharepoint.com/sites/CMSDCOTKrakow'
-AM = '7:00 - 15:00'
-PM = '12:00 - 20:00'
-BH = '9:00 - 17:00'
+debug = False
 
 # ======== Person ============
 def findPerson(api, cec):
@@ -33,10 +29,70 @@ def findMyRoom(api, roomName):
 
 #============= Messages =================
 def mention(email):
-	return '<@personEmail:{}>'.format(email)
+	if '@cisco.com' in email:
+		return '<@personEmail:{}>'.format(email)
+	else:
+		email+='@cisco.com'
+		return '<@personEmail:{}>'.format(email)
 
+def mentionGroup(emailList):
+	mentionList=''
+	for email in emailList:
+		if '@cisco.com' in email:
+			 mentionList+='<@personEmail:{}> '.format(email)
+		else:
+			email+='@cisco.com'
+			mentionList+='<@personEmail:{}> '.format(email)
+	#print ('Mention List: {}'.format(mentionList))
+	return mentionList
+
+def parseSelector(text=''):
+	selector = ''
+	if len(text) == 2:
+		selector = text[1].strip().upper()
+	elif len(text) >= 3:
+		selector = text[1].strip().upper()
+		text = msg.text.split(' ',2)[2]
+	return selector,text
+
+def actionSelector(api, msg, teams):
+	try:
+		selector,text = parseSelector (msg.text.split(' ',2))
+		
+		if debug:
+			print ("Message received {}".format(msg))
+			print ("Selector {}".format(selector))
+		
+		if selector == '':
+			return		# Do nothing if no instructions were sent
+		elif selector == 'HELP':
+			help=' =============== Help Menu ===============\nINFRA-T1 - Sends a message mentioning all Infra T1 Engineers (same for T2 & T3) \nSE-T1 - Sends a message  mentioning all the SE T1 Engineers (same for T2 & T3)\n\
+Infra-IMs - Sends a 1:1 message to each IM with the message'
+			api.messages.create(msg.roomId, text=help)
+		elif selector == 'INFRA-IMs':
+			#unicast to IMs the message
+			print("IMs")
+		elif selector in teams:
+			#print('@{}'.format(selector))
+			api.messages.create(msg.roomId, markdown=mentionGroup(teams[selector]))
+		else:
+			print('Unidentified selector, no action will be taken')
+	except Exception as e:
+		#type, value, traceback = sys.exc_info()
+		print ("Exception {}\nTraceback {}".format(e, traceback.print_exc()))
+
+def listToString(list, separator=' '):
+	return separator.join(list)
 
 #============= Read Excel ================
+def getSPCreds():
+	creds=('nbras@cisco.com','')
+	mypwd=''
+	while (not mypwd):
+		creds[1] = getpass("SP Password:")
+	
+	return creds
+
 def openShiftPlan(creds):
 	ctx_auth = AuthenticationContext(siteURL)
 	if ctx_auth.acquire_token_for_user(creds[0], creds[1]):
